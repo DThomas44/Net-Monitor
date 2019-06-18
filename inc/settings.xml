@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<netMonitor>
+	<settings>
+		<logInterval>10</logInterval>
+		<autoInterface>1</autoInterface>
+		<interface></interface>
+	</settings>
+</netMonitor>
