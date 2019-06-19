@@ -23,8 +23,18 @@ if (!settings.selectSingleNode("/netMonitor/settings/interface").text
     && !settings.selectSingleNode("/netMonitor/settings/autoInterface").text)
     settingsGUI(settings)
 
+;<=====  Variables  ===========================================================>
+downRate := 0
+upRate := 0
+maxDown := 0
+maxUp := 0
+totalDown := 0
+totalUp := 0
+
 ;<=====  Timers  ==============================================================>
+SetTimer, getNetData, 1000
 SetTimer, logNetUse, % (settings.selectSingleNode("/netMonitor/settings/logInterval").text * 60000)
+SetTimer, checkTime, 6000
 
 ;<=====  Setup NET Object  ====================================================>
 if settings.selectSingleNode("/netMonitor/settings/autoInterface").text
@@ -43,7 +53,36 @@ logFile := LogStart(settings)
 Return
 
 ;<=====  Functions  ===========================================================>
-LoadXML(file){
+checkTime(){
+    global
+    if ((A_Hour == 00) && (A_Min == 00))
+    {
+        logStop(logFile)
+        logFile := logStart(settings)
+    }
+}
+
+getNetData(){
+    Global
+    ;Get current net stats
+    NET.Update()
+    downRate := NET.RxBPS
+    upRate := NET.TxBPS
+
+    ;Update max rates
+    if (downRate > maxDown)
+        maxDown := downRate
+    if (upRate > maxUp)
+        maxUp := upRate
+
+    ;Update totals
+    totalDown += downRate
+    totalUp += upRate
+
+    return
+}
+
+loadXML(file){
     xmlFile := fileOpen(file, "r")
     xml := xmlFile.read()
     xmlFile.Close()
@@ -58,7 +97,7 @@ LoadXML(file){
     return doc
 }
 
-Log(fileName, text){
+log(fileName, text){
     FormatTime, TimeStamp, A_Now, [dd/MMM/yyyy HH:mm:ss]
     logFile := fileOpen(fileName, "a")
     logFile.Write(TimeStamp . " " . text . "`r`n")
@@ -66,15 +105,22 @@ Log(fileName, text){
     return 1
 }
 
-LogNetUse(fileName, NET){
+logNetUse(){
+    Global
     FormatTime, TimeStamp, A_Now, [dd/MMM/yyyy HH:mm:ss]
-    logFile := fileOpen(fileName, "a")
-    logFile.Write(TimeStamp . " " . text . "`r`n")
-    logFile.Close()
+    file := fileOpen(logFile, "a")
+    file.Write(TimeStamp . " Max Down:" . (maxDown/125000) . "Mbps - Max Up:" . (maxUp/125000)
+        . "Mbps - Total Down: " . sizeFormat(totalDown) . " - Total Up: " . sizeFormat(totalUp) . "`r`n")
+    file.Close()
+
+    ;Clear counters for next logging cycle
+    maxDown := 0
+    maxUp := 0
+
     return 1
 }
 
-LogStart(settings){
+logStart(settings){
     FormatTime, TimeStamp, A_Now, dd-MMM-yyyy_HH-mm-ss
     IfNotExist, % A_ScriptDir . "\Logs\"
         FileCreateDir, % A_ScriptDir . "\Logs"
@@ -87,15 +133,15 @@ LogStart(settings){
     }
     FormatTime, TimeStamp, A_Now, [dd/MMM/yyyy HH:mm:ss]
     logFile.Write(TimeStamp . " Logging started. Logging every "
-        . settings.selectSingleNode("/netMonitor/settings/logInerval").text
-        . " minutes using interface "
-        . settings.selectSingleNode("/netMonitor/settings/interface").text
+        . settings.selectSingleNode("/netMonitor/settings/logInterval").text
+        . " minutes using default interface."
+        ;. settings.selectSingleNode("/netMonitor/settings/interface").text
         . "`r`n")
     logFile.Close()
     return fileName
 }
 
-LogStop(fileName){
+logStop(fileName){
     FormatTime, TimeStamp, A_Now, [dd/MMM/yyyy HH:mm:ss]
     logFile := fileOpen(fileName, "a")
     logFile.Write(TimeStamp . " Logging finished.`r`n")
@@ -103,7 +149,7 @@ LogStop(fileName){
     return 1
 }
 
-SaveSettings(settings, tdoc){
+saveSettings(settings, tdoc){
     try {
         resultDoc := ComObjCreate("MSXML2.DOMdocument.6.0")
         settings.transformNodeToObject(tdoc, resultDoc)
@@ -145,6 +191,40 @@ settingsOK(){
     node.text := LogInterval
     SaveSettings(settings, tdoc)
     Return
+}
+
+sizeFormat(bytes,round:=0){
+    size:=0
+    if (bytes >= 1000000000000)
+    {     
+        size :=Round(bytes/1000000000000,2) " TB"
+    }
+    else if (bytes >= 1000000000)
+    {
+        size :=Round(bytes/1000000000,2) " GB"
+    }
+    else if (bytes >= 1000000)
+    {
+        if (round)
+        {
+            size :=Round(bytes/1000000,0) " MB"
+        }
+        else   
+            size :=Round(bytes/1000000,1) " MB"                 
+    }
+    else if (bytes >= 1000)
+    {
+        size :=Round(bytes/1000) " kB"
+    }
+    else if (!bytes || bytes == 0)
+    {
+        size :=0 " kB"
+    }
+    else
+    {
+            size := bytes " B"               
+    } 
+    return size
 }
 
 ;<=====  Includes  ============================================================>
