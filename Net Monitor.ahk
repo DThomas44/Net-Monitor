@@ -7,7 +7,6 @@
     bandwidth use over a specified period of time.
 
     To Do:
-        Complete actual logging implementation
         Implement selecting an interface in the settings GUI
 */
 ;<=====  System Settings  =====================================================>
@@ -58,6 +57,10 @@ checkTime(){
     if ((A_Hour == 00) && (A_Min == 00))
     {
         logStop(logFile)
+        totalDown := 0
+        totalUp := 0
+        maxDown := 0
+        maxUp := 0
         logFile := logStart(settings)
     }
 }
